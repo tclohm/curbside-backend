@@ -18,7 +18,7 @@ func openDB(path string) (*sql.DB, error) {
 
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS reports (
-			id INTEGER PRIMARY KEY,
+			id TEXT PRIMARY KEY,
 			plate TEXT NOT NULL,
 			color TEXT NOT NULL,
 			make_model TEXT,
