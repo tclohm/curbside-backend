@@ -67,7 +67,7 @@ func createReportHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // return every report, newest first 
-func listReportsHandler(db *sql.DB) http.HandleFunc {
+func listReportsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query(`
 			SELECT id, plate, color, make_model, address, issue_type, note, created_at FROM reports ORDER BY created_at DESC
@@ -82,7 +82,7 @@ func listReportsHandler(db *sql.DB) http.HandleFunc {
 
 		for rows.Next() {
 			var rep Report 
-			var makeModel, node sql.NullString
+			var makeModel, note sql.NullString
 			if err := rows.Scan(
 				&rep.ID, &rep.Plate, &rep.Color, &makeModel,
 				&rep.Address, &rep.IssueType, &note, &rep.CreatedAt,
@@ -106,15 +106,15 @@ func listReportsHandler(db *sql.DB) http.HandleFunc {
 	}
 }
 
-func getReportHandler(db *sql.DB) http.HandleFunc {
-	return func(w http.ReponseWriter, r *http.Request) {
+func getReportHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 
 		var rep Report 
 		var makeModel, note sql.NullString
-		err := dq.QueryRow(`
+		err := db.QueryRow(`
 			SELECT id, plate, color, make_model, address, issue_type, note, created_at FROM reports WHERE id = ?
-		`, id).SCAN(&rep.ID, &rep.Plate, &rep.Color, &makeModel, &rep.Address, &rep.IssueType, &note, &rep.CreatedAt)
+		`, id).Scan(&rep.ID, &rep.Plate, &rep.Color, &makeModel, &rep.Address, &rep.IssueType, &note, &rep.CreatedAt)
 		
 		// sql.ErrNoRows -- return when the query matched nothing - errors.Is check for that 
 		if errors.Is(err, sql.ErrNoRows) {
@@ -129,6 +129,6 @@ func getReportHandler(db *sql.DB) http.HandleFunc {
 		rep.Note = note.String
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).encode(rep)
+		json.NewEncoder(w).Encode(rep)
 	}
 }
