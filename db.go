@@ -2,9 +2,19 @@ package main
 
 import (
 	"database/sql"
-
-	_ "modernc.org/sqlite"
+	"errors"
+	"modernc.org/sqlite"
 )
+
+// Sqlite c-level result code for constraint violation
+const sqliteConstraintCode = 19
+
+// reports whether err represents the client sending
+// data that violates a table constraint 
+func isConstraintError(err error) bool {
+	var sqliteErr *sqlite.Error 
+	return errors.As(err, &sqliteErr) && sqliteErr.Code() == sqliteConstraintCode
+}
 
 // openDB opens (creating if necessary) the SQLite database at path 
 // and makes sure the schema exists. Unlike main(), it returns an error 
