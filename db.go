@@ -26,6 +26,16 @@ func openDB(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	// sqlite only allows one writer at a time 
+	// pragma settings are per-connection
+	// sidesteps SQLite's "database is locked" error under 
+	// concurrent writes
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		return nil, err
+	}
+
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS reports (
 			id TEXT PRIMARY KEY,
@@ -41,7 +51,25 @@ func openDB(path string) (*sql.DB, error) {
 				'Other'
 			)),
 			note TEXT,
+			status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN (
+				'submitted', 'under_review', 'resolved', 'withdrawn'
+			)),
+			corroboration_count INTEGER NOT NULL DEFAULT 1,
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS corroboration_responses (
+			id TEXT PRIMARY KEY,
+			report_id TEXT NOT NULL REFERENCES reports(id),
+			nonce TEXT NOT NULL,
+			answer TEXT NOT NULL CHECK (answer in ('still-there', 'gone', 'not-sure')),
+			responded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE (report_id, nonce)
 		)
 	`)
 	if err != nil {
