@@ -47,10 +47,14 @@ func createReportHandler(db *sql.DB) http.HandlerFunc {
 			`INSERT INTO reports (id, plate, color, make_model, address, issue_type, notes,
 		created_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			 input.ID, input.Plate, input.Color, input.MakeModel, input.Addresss, input.IssueType,
+			 input.ID, input.Plate, input.Color, input.MakeModel, input.Address, input.IssueType,
 			 input.Note, input.CreatedAt,
 		)
 		if err != nil {
+			if isConstraintError(err) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
