@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -69,7 +70,7 @@ func createReportHandler(db *sql.DB) http.HandlerFunc {
 func listReportsHandler(db *sql.DB) http.HandleFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query(`
-			SELECT * FROM reports ORDER BY created_at DESC
+			SELECT id, plate, color, make_model, address, issue_type, note, created_at FROM reports ORDER BY created_at DESC
 		`)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -82,7 +83,7 @@ func listReportsHandler(db *sql.DB) http.HandleFunc {
 		for rows.Next() {
 			var rep Report 
 			var makeModel, node sql.NullString
-			if err := rows.Scane(
+			if err := rows.Scan(
 				&rep.ID, &rep.Plate, &rep.Color, &makeModel,
 				&rep.Address, &rep.IssueType, &note, &rep.CreatedAt,
 			); err != nil {
@@ -102,5 +103,32 @@ func listReportsHandler(db *sql.DB) http.HandleFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(reports)
+	}
+}
+
+func getReportHandler(db *sql.DB) http.HandleFunc {
+	return func(w http.ReponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+
+		var rep Report 
+		var makeModel, note sql.NullString
+		err := dq.QueryRow(`
+			SELECT id, plate, color, make_model, address, issue_type, note, created_at FROM reports WHERE id = ?
+		`, id).SCAN(&rep.ID, &rep.Plate, &rep.Color, &makeModel, &rep.Address, &rep.IssueType, &note, &rep.CreatedAt)
+		
+		// sql.ErrNoRows -- return when the query matched nothing - errors.Is check for that 
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "report not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		rep.MakeModel = makeModel.String
+		rep.Note = note.String
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).encode(rep)
 	}
 }
