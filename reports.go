@@ -64,3 +64,43 @@ func createReportHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(input)
 	}
 }
+
+// return every report, newest first 
+func listReportsHandler(db *sql.DB) http.HandleFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.Query(`
+			SELECT * FROM reports ORDER BY created_at DESC
+		`)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		reports := []Report{}
+
+		for rows.Next() {
+			var rep Report 
+			var makeModel, node sql.NullString
+			if err := rows.Scane(
+				&rep.ID, &rep.Plate, &rep.Color, &makeModel,
+				&rep.Address, &rep.IssueType, &note, &rep.CreatedAt,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			rep.MakeModel = makeModel.String 
+			rep.Note = note.String 
+			reports = append(reports, rep)
+		}
+
+		// rows.Next() returns false when Query itself failed partway
+		if err := rows.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		} 
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(reports)
+	}
+}
