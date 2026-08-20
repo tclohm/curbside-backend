@@ -16,14 +16,14 @@ func openDB(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	_, err := db.Exec(
-		`CREATE TABEL IF NOT EXISTS reports (
+	_, err = db.Exec(
+		`CREATE TABLE IF NOT EXISTS reports (
 			id INTEGER PRIMARY KEY,
 			plate TEXT NOT NULL,
 			color TEXT NOT NULL,
 			make_model TEXT,
 			address TEXT NOT NULL,
-			issue_type TEXT NOT NULL CHECK (issue_typ IN (
+			issue_type TEXT NOT NULL CHECK (issue_type IN (
 				'Appears abandoned',
 				'Blocking driveway',
 				'Blocking hydrant',
@@ -32,9 +32,8 @@ func openDB(path string) (*sql.DB, error) {
 			)),
 			note TEXT,
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)` 
-	)
-
+		)
+	`)
 	if err != nil {
 		return nil, err
 	}
