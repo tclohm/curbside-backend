@@ -17,7 +17,7 @@ type Report struct {
 	MakeModel 				 string `json:"make_model,omitempty"`
 	Address 					 string `json:"address"`
 	IssueType 				 string `json:"issue_type"`
-	Note 							 string `json:"node,omitempty"`
+	Note							 string `json:"note,omitempty"`
 	Status 						 string `json:"status"`
 	CorroborationCount int `json:"corroboration_count"`
 	CreatedAt 				 string `json:"created_at"`
@@ -50,7 +50,7 @@ func createReportHandler(db *sql.DB) http.HandlerFunc {
 		input.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 
 		_, err = db.Exec(
-			`INSERT INTO reports (id, plate, color, make_model, address, issue_type, notes,
+			`INSERT INTO reports (id, plate, color, make_model, address, issue_type, note,
 		status, corroboration_count, created_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			 input.ID, input.Plate, input.Color, input.MakeModel, input.Address, input.IssueType,
