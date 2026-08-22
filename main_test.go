@@ -11,7 +11,7 @@ import (
 // fresh, empty, in-memory SQLite
 func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := open(":memory:")
+	db, err := openDB(":memory:")
 	if err != nil {
 		t.Fatalf("openDB: %v", err)
 	}
@@ -21,7 +21,7 @@ func newTestDB(t *testing.T) *sql.DB {
 
 // builds a request, routes it through
 // the real mux and returns the recorded response
-func doRequest(t *testing.T, mux *http.ServerMux, method, path, body string) *httptest.ResponseRecorder {
+func doRequest(t *testing.T, mux *http.ServeMux, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
