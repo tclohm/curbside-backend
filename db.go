@@ -13,7 +13,7 @@ const sqliteConstraintCode = 19
 // data that violates a table constraint 
 func isConstraintError(err error) bool {
 	var sqliteErr *sqlite.Error 
-	return errors.As(err, &sqliteErr) && sqliteErr.Code() == sqliteConstraintCode
+	return errors.As(err, &sqliteErr) && sqliteErr.Code()&0xff == sqliteConstraintCode
 }
 
 // openDB opens (creating if necessary) the SQLite database at path 
@@ -67,7 +67,7 @@ func openDB(path string) (*sql.DB, error) {
 			id TEXT PRIMARY KEY,
 			report_id TEXT NOT NULL REFERENCES reports(id),
 			nonce TEXT NOT NULL,
-			answer TEXT NOT NULL CHECK (answer in ('still-there', 'gone', 'not-sure')),
+			answer TEXT NOT NULL CHECK (answer IN ('still-there', 'gone', 'not-sure')),
 			responded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE (report_id, nonce)
 		)

@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -11,19 +12,21 @@ import (
 )
 
 type CorroborationResponse struct {
-	ID 			 		string `json:"id"`
-	ReportID 		string `json:"report_id"`
-	Nonce 			string `json:"nonce"`
-	Answer 			string `json:"answer"`
-	RespondedAt	string `json:"Responded_at"`
+	ID          string `json:"id"`
+	ReportID    string `json:"report_id"`
+	Nonce       string `json:"nonce"`
+	Answer      string `json:"answer"`
+	RespondedAt string `json:"responded_at"`
 }
 
-// look at prior response for this
-// answering is optional
-func getExisitingCorroboration(db *sql.DB, reportID, nonce string) (*CorroborationResponse, error) {
+// getExistingCorroboration looks up a prior response for this (report,
+// nonce) pair, if any. Returns (nil, nil) — not an error — when there
+// isn't one; answering is optional, so "no prior answer" is a normal,
+// expected outcome, not a failure.
+func getExistingCorroboration(db *sql.DB, reportID, nonce string) (*CorroborationResponse, error) {
 	var resp CorroborationResponse
 	err := db.QueryRow(`
-		SELECT id, report_id, nonce, answer, responded_at 
+		SELECT id, report_id, nonce, answer, responded_at
 		FROM corroboration_responses
 		WHERE report_id = ? AND nonce = ?
 	`, reportID, nonce).Scan(&resp.ID, &resp.ReportID, &resp.Nonce, &resp.Answer, &resp.RespondedAt)
@@ -31,18 +34,21 @@ func getExisitingCorroboration(db *sql.DB, reportID, nonce string) (*Corroborati
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
-
 	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-// records a response ("still-there" / "gone" / "not-sure" )
-// from a nonce to a specific report 
+// createCorroborationHandler records a response ("still-there" / "gone" /
+// "not-sure") from a nonce to a specific report. Recording is idempotent
+// per (report, nonce) — the same nonce answering twice gets back its
+// original answer rather than being counted again — and only a
+// "still-there" answer moves the report's corroboration_count forward.
 func createCorroborationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reportID := r.PathValue("id")
+
 		var input struct {
 			Nonce  string `json:"nonce"`
 			Answer string `json:"answer"`
@@ -59,8 +65,10 @@ func createCorroborationHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "answer must be one of: still-there, gone, not-sure", http.StatusBadRequest)
 			return
 		}
-		// confirm report actually exists
-		var exists int 
+
+		// Confirm the report actually exists before accepting a response to
+		// it — a clear 404 beats a confusing foreign-key failure.
+		var exists int
 		err := db.QueryRow(`SELECT 1 FROM reports WHERE id = ?`, reportID).Scan(&exists)
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "report not found", http.StatusNotFound)
@@ -71,8 +79,9 @@ func createCorroborationHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// nonce already answered
-		existing, err := getExisitingCorroboration(db, reportID, input.Nonce)
+		// Idempotency: if this nonce already answered, hand back that
+		// original answer instead of recording (or rejecting) another one.
+		existing, err := getExistingCorroboration(db, reportID, input.Nonce)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -88,7 +97,6 @@ func createCorroborationHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		resp := CorroborationResponse{
 			ID:          id.String(),
 			ReportID:    reportID,
@@ -109,7 +117,7 @@ func createCorroborationHandler(db *sql.DB) http.HandlerFunc {
 				// before either inserts — a check-then-act race. Whichever
 				// loses lands here; treat it the same as finding it above,
 				// rather than erroring over what's really the same answer.
-				existing, ferr := getExisitingCorroboration(db, reportID, input.Nonce)
+				existing, ferr := getExistingCorroboration(db, reportID, input.Nonce)
 				if ferr == nil && existing != nil {
 					w.Header().Set("Content-Type", "application/json")
 					json.NewEncoder(w).Encode(existing)
@@ -154,3 +162,4 @@ func createCorroborationHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(resp)
 	}
 }
+
