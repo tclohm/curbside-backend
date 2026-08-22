@@ -24,7 +24,7 @@ func getExisitingCorroboration(db *sql.DB, reportID, nonce string) (*Corroborati
 	var resp CorroborationResponse
 	err := db.QueryRow(`
 		SELECT id, report_id, nonce, answer, responded_at 
-		FROM corroboration_reponses
+		FROM corroboration_responses
 		WHERE report_id = ? AND nonce = ?
 	`, reportID, nonce).Scan(&resp.ID, &resp.ReportID, &resp.Nonce, &resp.Answer, &resp.RespondedAt)
 
