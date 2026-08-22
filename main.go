@@ -12,7 +12,7 @@ func main() {
 	}
 	defer db.Close()
 
-	log.Printf("reports table ready")
+	log.Printf("[INFO] - reports table ready")
 
 	mux := http.NewServeMux()
 
@@ -24,5 +24,6 @@ func main() {
   mux.HandleFunc("GET /reports", listReportsHandler(db))
   mux.HandleFunc("GET /reports/{id}", getReportHandler(db))
   mux.HandleFunc("POST /reports/{id}/corroborations", createCorroborationHandler(db))
+	log.Printf("[INFO] - listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
