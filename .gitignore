@@ -30,3 +30,6 @@ go.work.sum
 
 # db 
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
