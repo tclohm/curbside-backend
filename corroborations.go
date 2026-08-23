@@ -15,14 +15,15 @@ type CorroborationResponse struct {
 	ReportID 		string `json:"report_id"`
 	Nonce 			string `json:"nonce"`
 	Answer 			string `json:"answer"`
-	ResponsedAt	string `json:"Responsed_at"`
+	RespondedAt	string `json:"Responded_at"`
 }
 
 // look at prior response for this
 // answering is optional
-func getExisitingCorroboration(db *sql.DB, reportID, nonce string) (*CorroborationResponse, error) {
-	var resp db.QueryRow(`
-		SELECT id, report_id, nonce, answer, response_at 
+func getExistingCorroboration(db *sql.DB, reportID, nonce string) (*CorroborationResponse, error) {
+	var resp CorroborationResponse
+	err := db.QueryRow(`
+		SELECT id, report_id, nonce, answer, responded_at 
 		FROM corroboration_reponses
 		WHERE report_id = ? AND nonce = ?
 	`, reportID, nonce).Scan(&resp.ID, &resp.ReportID, resp.Nonce, &resp.Answer, &resp.RespondedAt)
@@ -62,7 +63,93 @@ func createCorroborationHandler(db *sql.DB) http.HandlerFunc {
 		var exists int 
 		err := db.QueryRow(`SELECT 1 FROM reports WHERE id = ?`, reportID).Scan(&exists)
 		if errors.Is(err, sql.ErrNoRows) {
-			http
+			http.Error(w, "report not found", http.StatusNotFound)
+			return
 		}
-	}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Idempotency: if this nonce already answered, hand back that
+		// original answer instead of recording (or rejecting) another one.
+		existing, err := getExistingCorroboration(db, reportID, input.Nonce)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if existing != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(existing)
+			return
+		}
+
+		id, err := uuid.NewV7()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp := CorroborationResponse{
+			ID:          id.String(),
+			ReportID:    reportID,
+			Nonce:       input.Nonce,
+			Answer:      input.Answer,
+			RespondedAt: time.Now().UTC().Format(time.RFC3339),
+		}
+
+		_, err = db.Exec(
+			`INSERT INTO corroboration_responses (id, report_id, nonce, answer, responded_at)
+			 VALUES (?, ?, ?, ?, ?)`,
+			resp.ID, resp.ReportID, resp.Nonce, resp.Answer, resp.RespondedAt,
+		)
+		if err != nil {
+			if isConstraintError(err) {
+				// Known, accepted gap: two requests for the same brand-new
+				// (report, nonce) pair could both pass the check above
+				// before either inserts — a check-then-act race. Whichever
+				// loses lands here; treat it the same as finding it above,
+				// rather than erroring over what's really the same answer.
+				existing, ferr := getExistingCorroboration(db, reportID, input.Nonce)
+				if ferr == nil && existing != nil {
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(existing)
+					return
+				}
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if input.Answer == "still-there" {
+			// The increment happens inside the database, in one statement,
+			// rather than "read count in Go, add 1, write it back" — that
+			// read-modify-write pattern is a classic race under concurrent
+			// requests (two requests could both read 1 and both write 2,
+			// losing an increment). Expressing it as `count = count + 1`
+			// makes SQLite do the read-and-write atomically.
+			if _, err := db.Exec(
+				`UPDATE reports SET corroboration_count = corroboration_count + 1 WHERE id = ?`,
+				reportID,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			// Guarded by status = 'submitted' so this only ever fires once,
+			// no matter how many "still-there" responses arrive after the
+			// threshold, or in what order concurrent requests land.
+			if _, err := db.Exec(
+				`UPDATE reports SET status = 'under_review'
+				 WHERE id = ? AND status = 'submitted' AND corroboration_count >= 2`,
+				reportID,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(resp)	}
 }
