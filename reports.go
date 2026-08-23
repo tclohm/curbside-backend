@@ -138,3 +138,7 @@ func getReportHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(rep)
 	}
 }
+
+func isJPEG(data []byte) bool {
+	return len(data) >= 2 && data[0] == 0xFF && data[1] == 0xD8
+}

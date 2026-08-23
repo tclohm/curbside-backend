@@ -8,7 +8,7 @@ import (
 )
 
 func TestExifGPS(t *testing.T) {
-	f, err := os.Open("testdata/test.jpg")
+	f, err := os.Open("testdata/test_converted.jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
