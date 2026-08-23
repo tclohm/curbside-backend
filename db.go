@@ -76,5 +76,24 @@ func openDB(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS pending_uploads (
+			id TEXT PRIMARY KEY,
+			photo_path TEXT NOT NULL,
+			lat REAL NOT NULL,
+			lng REAL NOT NULL,
+			exif_lat REAL,
+			exif_lng REAL,
+			plate_guess TEXT,
+			color_guess TEXT,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+
+
 	return db, nil
 }
