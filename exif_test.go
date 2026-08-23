@@ -19,7 +19,7 @@ func TestExifGPS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lat, lng := x.LatLong()
+	lat, lng, err := x.LatLong()
 	if err != nil {
 		t.Fatal(err)
 	}
