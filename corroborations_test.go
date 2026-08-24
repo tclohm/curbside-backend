@@ -11,7 +11,8 @@ func createTestReport(t *testing.T, mux *http.ServeMux) Report {
 	t.Helper()
 	rec := doRequest(t, mux, "POST", "/reports", `{
 		"plate": "8XYZ123", "color": "Silver",
-		"address": "123 Oak St", "issue_type": "Appears abandoned"
+		"address": "123 Oak St", "issue_type": "Appears abandoned",
+		"photo_path": "testdata/fake.jpg"
 	}`)
 	var report Report
 	if err := json.Unmarshal(rec.Body.Bytes(), &report); err != nil {
