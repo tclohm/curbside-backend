@@ -31,12 +31,12 @@ func startExpirySweeper(db *sql.DB, interval time.Duration) {
 // either still exists (safe: retried next cycle) or is already gone 
 // (safe: next cycle's file delete become a harmless no-op) - never a DB 
 // row pointing at nothing with no way to notice
-func sweepExiredUploads(db *sql.DB) error {
+func sweepExpiredUploads(db *sql.DB) error {
 	cutoff := time.Now().UTC().Add(-pendingUploadTTL).Format(time.RFC3339)
 
 	rows, err := db.Query(
 		`SELECT id, photo_path FROM pending_uploads WHERE created_at < ?`,
-		cutoff
+		cutoff,
 	)
 	if err != nil {
 		return err
