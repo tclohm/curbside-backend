@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -30,6 +31,12 @@ func main() {
 	defer db.Close()
 
 	log.Printf("[INFO] - reports table ready")
+
+	if err := os.MkdirAll(pendingUploadsDir, 0755); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("[INFO] - %s ready", pendingUploadsDir)
 
 	startExpirySweeper(db, time.Minute)
 	log.Printf("[INFO] - expiry sweeper running (every 1m, TTL 8m)")
