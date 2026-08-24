@@ -8,6 +8,20 @@ import (
 	"time"
 )
 
+// photos live while a report is still being composed (photo uploaded, ML pending/done, user has not hit final submut yet) Flat - not nested by date - because rows here live at most 
+// pendingUploadTTL (8 minutes) before the sweeper deletes them
+const pendingUploadsDir = "uploads/pending"
+
+// write photo bytes to disk under pendingUploadDir, named by the pending_uploads id 
+// and returns the path to store in that row's photo_path column
+func savePendingPhoto(id string, data []byte) (string, error) {
+	path := pendingUploadsDir + "/" + id + ".jpg"
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // check the bytes of an uploaded file rather than trusting
 // the client-supplied Content-Type header (easily wrong or spoofed)
 // Sniff the first bytes against known file signature - for jpeg 
