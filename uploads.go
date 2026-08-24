@@ -7,6 +7,17 @@ import (
 	"time"
 )
 
+// check the bytes of an uploaded file rather than trusting
+// the client-supplied Content-Type header (easily wrong or spoofed)
+// Sniff the first bytes against known file signature - for jpeg 
+func isJPEG(data []byte) bool {
+	return http.DetectContentType(data) == "image/jpeg"
+}
+
+// how long is pending_uploads row is allowed to live
+// before it's considered expired. This is the same 8-minute window
+// enforced authoritatively in POST /reports (check fresh agains created_at 
+// submit time) -- sweep for clean up
 const pendingUploadTTL = 8 * time.Minute
 
 // launches a background goroutine that periodically 
