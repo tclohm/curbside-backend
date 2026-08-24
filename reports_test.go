@@ -12,7 +12,8 @@ func TestCreateReport_Success(t *testing.T) {
 
 	rec := doRequest(t, mux, "POST", "/reports", `{
 		"plate": "8XYZ123", "color": "Silver",
-		"address": "123 Oak St", "issue_type": "Appears abandoned"
+		"address": "123 Oak St", "issue_type": "Appears abandoned",
+		"photo_path": "testdata/fake.jpg"
 	}`)
 
 	if rec.Code != http.StatusCreated {
@@ -83,8 +84,8 @@ func TestListReports_ReturnsCreated(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
 
-	doRequest(t, mux, "POST", "/reports", `{"plate":"AAA111","color":"Red","address":"1 First St","issue_type":"Other"}`)
-	doRequest(t, mux, "POST", "/reports", `{"plate":"BBB222","color":"Blue","address":"2 Second St","issue_type":"Other"}`)
+	doRequest(t, mux, "POST", "/reports", `{"plate":"AAA111","color":"Red","address":"1 First St","issue_type":"Other","photo_path":"testdata/fake.jpg"}`)
+	doRequest(t, mux, "POST", "/reports", `{"plate":"BBB222","color":"Blue","address":"2 Second St","issue_type":"Other","photo_path":"testdata/fake.jpg"}`)
 
 	rec := doRequest(t, mux, "GET", "/reports", "")
 
@@ -101,7 +102,7 @@ func TestGetReport(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
 
-	created := doRequest(t, mux, "POST", "/reports", `{"plate":"8XYZ123","color":"Silver","address":"123 Oak St","issue_type":"Appears abandoned"}`)
+	created := doRequest(t, mux, "POST", "/reports", `{"plate":"8XYZ123","color":"Silver","address":"123 Oak St","issue_type":"Appears abandoned","photo_path":"testdata/fake.jpg"}`)
 	var report Report
 	json.Unmarshal(created.Body.Bytes(), &report)
 

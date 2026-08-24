@@ -43,6 +43,7 @@ func openDB(path string) (*sql.DB, error) {
 			color TEXT NOT NULL,
 			make_model TEXT,
 			address TEXT NOT NULL,
+			photo_path Text NOT NULL,
 			issue_type TEXT NOT NULL CHECK (issue_type IN (
 				'Appears abandoned',
 				'Blocking driveway',
