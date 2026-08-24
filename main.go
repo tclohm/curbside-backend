@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"time"
 )
 
 func newMux(db *sql.DB) *http.ServeMux {
@@ -29,6 +30,9 @@ func main() {
 	defer db.Close()
 
 	log.Printf("[INFO] - reports table ready")
+
+	startExpirySweeper(db, time.Minute)
+	log.Printf("[INFO] - expiry sweeper running (every 1m, TTL 8m)")
 
 	log.Printf("[INFO] - listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", newMux(db)))
