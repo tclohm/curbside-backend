@@ -2,11 +2,108 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+// cap the whole incoming request body for POST /photos 
+// mobile app compresses / converts photos to JPEG before sending 
+// target -200KB - 1MB 
+// 5MB lease real headroom
+const maxUploadBytes = 5 << 20 // 5MB 
+
+type pendingUploadResponse struct {
+	ID 		 		string `json:"id"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+func createPendingUploadHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			http.Error(w, "request too larget or malformed", http.StatusBadRequest)
+			return
+		}
+		
+		file, _, err := r.FormFile("photo")
+		if err != nil {
+			http.Error(w, "photo is required", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		imgBytes, err := io.ReadAll(file)
+		if err != nil {
+			http.Error(w, "could not read photo", http.StatusInternalServerError)
+			return
+		}
+
+		if !isJPEG(imgBytes) {
+			http.Error(w, "photo must be a JPEG", http.StatusBadRequest)
+			return
+		}
+
+		lat, err := strconv.ParseFloat(r.FormValue("lat"), 64)
+		if err != nil {
+			http.Error(w, "lat is required and must be a number", http.StatusBadRequest)
+			return
+		}
+
+		lng, err := strconv.ParseFloat(r.FormValue("lng"), 64)
+		if err != nil {
+			http.Error(w, "lng is required and must be a number", http.StatusBadRequest)
+			return
+		}
+
+		if lat < -90 || lat > 90 || lng < -180 || lng > 180 {
+			http.Error(w, "lat/lng out of valid range", http.StatusBadRequest)
+			return
+		}
+
+		// TODO: decode EXIF from imgBytes (exif.Decode + x.LatLong())
+		// compare against lat/lng using the haversine distance 
+
+		id, err := uuid.NewV7()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		photoPath, err := savePendingPhoto(id.String(), imgBytes)
+		if err != nil {
+			http.Error(w, "could not save photo", http.StatusInternalServerError)
+			return
+		}
+
+		createdAt := time.Now().UTC()
+		_, err := db.Exec(
+			`INSERT INTO pending_uploads (id, photo_path, lat, lng, created_at)
+			 VALUES (?, ?, ?, ?, ?)`,
+			 id.String(), photoPath, lat, lng, createdAt.Format(time.RFC3339),
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		resp := pendingUploadResponse{
+			ID: 			 id.String(),
+			ExpiresAt: createdAt.Add(pendingUploadTTL).Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(resp)
+	}
+}
+
 
 // photos live while a report is still being composed (photo uploaded, ML pending/done, user has not hit final submut yet) Flat - not nested by date - because rows here live at most 
 // pendingUploadTTL (8 minutes) before the sweeper deletes them
