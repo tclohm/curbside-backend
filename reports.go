@@ -148,7 +148,7 @@ func createReportHandler(db *sql.DB) http.HandlerFunc {
 		if err := os.MkdirAll(filepath.Dir(report.PhotoPath), 0755); err != nil {
 			log.Printf("[ERROR] - could not create report photo directory for %s: %v", report.ID, err)
 		} else if err := os.Rename(pendingPhotoPath, report.PhotoPath); err != nil {
-			log.Printf("[ERRPR] - could not move photo for report %s: %v", report.ID, err)
+			log.Printf("[ERROR] - could not move photo for report %s: %v", report.ID, err)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

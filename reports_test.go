@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 )
@@ -84,11 +85,13 @@ func TestListReports_ReturnsCreated(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
 
-	doRequest(t, mux, "POST", "/reports", `{"plate":"AAA111","color":"Red","address":"1 First St","issue_type":"Other","photo_path":"testdata/fake.jpg"}`)
-	doRequest(t, mux, "POST", "/reports", `{"plate":"BBB222","color":"Blue","address":"2 Second St","issue_type":"Other","photo_path":"testdata/fake.jpg"}`)
-
+	pendingID1 := insertTestPendingUpload(t, db)
+	pendingID2 := insertTestPendingUpload(t, db)
+	doRequest(t, mux, "POST", "/reports", fmt.Sprintf(`{"plate":"AAA111","color":"Red","address":"1 First St","issue_type":"Other","pending_upload_id":%q}`, pendingID1))
+	doRequest(t, mux, "POST", "/reports", fmt.Sprintf(`{"plate":"BBB222","color":"Blue","address":"2 Second St","issue_type":"Other","pending_upload_id":%q}`, pendingID2))
+ 
 	rec := doRequest(t, mux, "GET", "/reports", "")
-
+ 
 	var got []Report
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decoding response: %v", err)
@@ -101,8 +104,9 @@ func TestListReports_ReturnsCreated(t *testing.T) {
 func TestGetReport(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
+	pendingID := insertTestPendingUpload(t, db)
 
-	created := doRequest(t, mux, "POST", "/reports", `{"plate":"8XYZ123","color":"Silver","address":"123 Oak St","issue_type":"Appears abandoned","photo_path":"testdata/fake.jpg"}`)
+	created := doRequest(t, mux, "POST", "/reports", fmt.Sprintf(`{"plate":"8XYZ123","color":"Silver","address":"123 Oak St","issue_type":"Appears abandoned","pending_upload_id":%q}`, pendingID))
 	var report Report
 	json.Unmarshal(created.Body.Bytes(), &report)
 

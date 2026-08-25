@@ -1,19 +1,22 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 )
 
 // corroboration test needs a report to corroborate against first.
-func createTestReport(t *testing.T, mux *http.ServeMux) Report {
+func createTestReport(t *testing.T, mux *http.ServeMux, db *sql.DB) Report {
 	t.Helper()
-	rec := doRequest(t, mux, "POST", "/reports", `{
+	pendingID := insertTestPendingUpload(t, db)
+	rec := doRequest(t, mux, "POST", "/reports", fmt.Sprintf(`{
 		"plate": "8XYZ123", "color": "Silver",
 		"address": "123 Oak St", "issue_type": "Appears abandoned",
-		"photo_path": "testdata/fake.jpg"
-	}`)
+		"pending_upload_id": %q
+	}`, pendingID))
 	var report Report
 	if err := json.Unmarshal(rec.Body.Bytes(), &report); err != nil {
 		t.Fatalf("decoding created report: %v", err)
@@ -24,7 +27,7 @@ func createTestReport(t *testing.T, mux *http.ServeMux) Report {
 func TestCorroboration_StillThereFlipsStatusAtTwo(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
-	report := createTestReport(t, mux)
+	report := createTestReport(t, mux, db)
 
 	rec := doRequest(t, mux, "POST", "/reports/"+report.ID+"/corroborations",
 		`{"nonce":"nonce-A","answer":"still-there"}`)
@@ -44,7 +47,7 @@ func TestCorroboration_StillThereFlipsStatusAtTwo(t *testing.T) {
 func TestCorroboration_SameNonceIsIdempotent(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
-	report := createTestReport(t, mux)
+	report := createTestReport(t, mux, db)
 
 	first := doRequest(t, mux, "POST", "/reports/"+report.ID+"/corroborations",
 		`{"nonce":"nonce-A","answer":"still-there"}`)
@@ -72,7 +75,7 @@ func TestCorroboration_SameNonceIsIdempotent(t *testing.T) {
 func TestCorroboration_GoneDoesNotAffectCount(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
-	report := createTestReport(t, mux)
+	report := createTestReport(t, mux, db)
 
 	doRequest(t, mux, "POST", "/reports/"+report.ID+"/corroborations",
 		`{"nonce":"nonce-B","answer":"gone"}`)
@@ -110,7 +113,7 @@ func TestCorroboration_BadRequest(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			db := newTestDB(t)
 			mux := newMux(db)
-			report := createTestReport(t, mux)
+			report := createTestReport(t, mux, db)
 
 			rec := doRequest(t, mux, "POST", "/reports/"+report.ID+"/corroborations", c.body)
 			if rec.Code != http.StatusBadRequest {

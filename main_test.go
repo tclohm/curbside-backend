@@ -41,7 +41,7 @@ func insertTestPendingUpload(t *testing.T, db *sql.DB) string {
 	t.Helper()
 	id, err := uuid.NewV7()
 	if err != nil {
-		t.Fatalf("uuid.NewV7:", err)
+		t.Fatalf("uuid.NewV7: %v", err)
 	}
 	_, err = db.Exec(
 		`INSERT INTO pending_uploads (id, photo_path, lat, lng, exif_lat, exif_lng, created_at)
