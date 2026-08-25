@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rwcarlsen/goexif/exif"
 )
 
 // cap the whole incoming request body for POST /photos 
@@ -68,8 +70,25 @@ func createPendingUploadHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// TODO: decode EXIF from imgBytes (exif.Decode + x.LatLong())
-		// compare against lat/lng using the haversine distance 
+		exifData, err := exif.Decode(bytes.NewReader(imgBytes))
+		if err != nil {
+			http.Error(w, "photo has no location data", http.StatusBadRequest)
+			return
+		}
+
+		exifLat, exifLng, err := exifData.LatLong()
+		if err != nil {
+			http.Error(w, "photo has no location data", http.StatusBadRequest)
+			return
+		}
+
+
+		distance := haversineDistanceMeters(lat, lng, exifLat, exifLng)
+		if distance > gpsMismatchThresholdMeters {
+			http.Error(w, "photo location does not match your location", http.StatusBadRequest)
+			return
+		}
+
 
 		id, err := uuid.NewV7()
 		if err != nil {
@@ -85,8 +104,8 @@ func createPendingUploadHandler(db *sql.DB) http.HandlerFunc {
 
 		createdAt := time.Now().UTC()
 		_, err = db.Exec(
-			`INSERT INTO pending_uploads (id, photo_path, lat, lng, created_at)
-			 VALUES (?, ?, ?, ?, ?)`,
+			`INSERT INTO pending_uploads (id, photo_path, lat, lng, exif_lat, exif_lng, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			 id.String(), photoPath, lat, lng, createdAt.Format(time.RFC3339),
 		)
 		if err != nil {
