@@ -10,12 +10,13 @@ import (
 func TestCreateReport_Success(t *testing.T) {
 	db := newTestDB(t)
 	mux := newMux(db)
+	pendingID := insertTestPendingUpload(t, db)
 
-	rec := doRequest(t, mux, "POST", "/reports", `{
+	rec := doRequest(t, mux, "POST", "/reports", fmt.Sprintf(`{
 		"plate": "8XYZ123", "color": "Silver",
 		"address": "123 Oak St", "issue_type": "Appears abandoned",
-		"photo_path": "testdata/fake.jpg"
-	}`)
+		"pending_upload_id": %q
+	}`, pendingID))
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusCreated, rec.Body)
