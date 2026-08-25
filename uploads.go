@@ -83,7 +83,7 @@ func createPendingUploadHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		createdAt := time.Now().UTC()
-		_, err := db.Exec(
+		_, err = db.Exec(
 			`INSERT INTO pending_uploads (id, photo_path, lat, lng, created_at)
 			 VALUES (?, ?, ?, ?, ?)`,
 			 id.String(), photoPath, lat, lng, createdAt.Format(time.RFC3339),
