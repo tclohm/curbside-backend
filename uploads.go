@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"math"
@@ -245,7 +246,7 @@ func sweepExpiredUploads(db *sql.DB) error {
 // that's either still there (safe: retryable) or already gone (safe: 
 // next attempt's file delete is a harmless no-op)
 func deletePendingUpload(db *sql.DB, id, photoPath string) error {
-	if err := os.Remove(photoPath); err != nil && !os.IsNoExist(err) {
+	if err := os.Remove(photoPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	_, err := db.Exec(`DELETE FROM pending_uploads WHERE id = ?`, id)
@@ -263,7 +264,7 @@ func deletePendingUploadHandler(db *sql.DB) http.HandlerFunc {
 		var photoPath string
 
 		err := db.QueryRow(`SELECT photo_path FROM pending_uploads id = ?`, id).Scan(&photoPath)
-		if errors.Is(eer, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
