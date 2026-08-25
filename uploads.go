@@ -27,6 +27,9 @@ type pendingUploadResponse struct {
 	ExpiresAt string `json:"expires_at"`
 }
 
+// accepts a photo + device lat/lng, validates it, saves it to disk, 
+// and create a pending_uploads row the client will later reference from 
+// POST /reports (or cancel vial DELETE /photos/{id})
 func createPendingUploadHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
@@ -228,17 +231,48 @@ func sweepExpiredUploads(db *sql.DB) error {
 	rows.Close()
 
 	for _, e := range toDelete {
-		// os.Remove returning "file doesnt exist" is fine here - that's 
-		// the harmless-no-op case described above, not a real failure
-		if err := os.Remove(e.photoPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("[ERROR] could not remove photo %s for pending_upload %s: %v", e.photoPath, e.id, err)
-			continue // leave the DB row for the next sweep to retry
-		}
-
-		if _, err := db.Exec(`DELETE FROM pending_uploads WHERE id = ?`, e.id); err != nil {
-			log.Printf("[ERROR] could not delete pending_upload %s: %v", e.id, err)
+		if err := deletePendingUpload(db, e.id, e.photoPath); err != nil {
+			log.Printf("[ERROR] sweeping pending_upload %s: %v", e.id, err)
 		}
 	}
 
 	return nil
+}
+
+// removes pending_uploads row's photo file from disk first, 
+// then deletes the DB row - same ordering reasoning as the 
+// sweep above: a row left behind by a failure still points at a photo
+// that's either still there (safe: retryable) or already gone (safe: 
+// next attempt's file delete is a harmless no-op)
+func deletePendingUpload(db *sql.DB, id, photoPath string) error {
+	if err := os.Remove(photoPath); err != nil && !os.IsNoExist(err) {
+		return err
+	}
+	_, err := db.Exec(`DELETE FROM pending_uploads WHERE id = ?`, id)
+	return err
+}
+
+// handles an explicit user cancel: delete the photo and pending_uploads
+// row immediately, rather than waitiung for the sweeper 
+// Idemponent - deleting an id that's already gone (expired, already submitted,
+// or never existed) is still a 204: the end state the caller wants ("this doesnt exist")
+// is already true either way
+func deletePendingUploadHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		var photoPath string
+
+		err := db.QueryRow(`SELECT photo_path FROM pending_uploads id = ?`, id).Scan(&photoPath)
+		if errors.Is(eer, sql.ErrNoRows) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
