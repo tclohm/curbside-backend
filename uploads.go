@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -102,6 +103,29 @@ func createPendingUploadHandler(db *sql.DB) http.HandlerFunc {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(resp)
 	}
+}
+
+// gps mismatch threshold meters is how far apart device-reported lat/lng 
+// photos EXIF lat/lng are allowed to have before a submission is rejected
+// 150m leaves real headroom for drift while still catching a geniunely diff location
+const gpsMismatchThresholdMeters = 150.0
+
+// earth mean radius
+const earthRadiusMeters = 6371000.0
+
+// returns the great-circle distance in meters btwn two lat/lng points 
+func haversineDistanceMeters(lat1, lng1, lat2, lng2 float64) float64 {
+	toRad := func(deg float64) float64 { return deg * math.Pi / 180 }
+	
+	lat1Rad, lat2Rad := toRad(lat1), toRad(lat2)
+	dLat := toRad(lat2 - lat1)
+	dLng := toRad(lng2 - lng1)
+
+	a := math.Sin(dLat / 2) * math.Sin(dLat / 2) + 
+			 math.Cos(lat1Rad) * math.Cos(lat2Rad) * math.Sin(dLng / 2) * math.Sin(dLng / 2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1 - a))
+
+	return earthRadiusMeters * c
 }
 
 
