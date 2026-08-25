@@ -19,6 +19,7 @@ func newMux(db *sql.DB) *http.ServeMux {
   mux.HandleFunc("GET /reports", listReportsHandler(db))
   mux.HandleFunc("GET /reports/{id}", getReportHandler(db))
   mux.HandleFunc("POST /reports/{id}/corroborations", createCorroborationHandler(db))
+	mux.HandleFunc("POST /photos", createPendingUploadHandler(db))
 
   return mux
 }
