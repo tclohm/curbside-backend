@@ -39,6 +39,11 @@ func doRequest(t *testing.T, mux *http.ServeMux, method, path, body string) *htt
 // a POST /reports payload
 func insertTestPendingUpload(t *testing.T, db *sql.DB) string {
 	t.Helper()
+	return insertTestPendingUploadWithPhoto(t, db, "testdata/fake.jpg")
+}
+
+func insertTestPendingUploadWithPhoto(t *testing.T, db *sql.DB, photoPath string) string {
+	t.Helper()
 	id, err := uuid.NewV7()
 	if err != nil {
 		t.Fatalf("uuid.NewV7: %v", err)
@@ -46,10 +51,11 @@ func insertTestPendingUpload(t *testing.T, db *sql.DB) string {
 	_, err = db.Exec(
 		`INSERT INTO pending_uploads (id, photo_path, lat, lng, exif_lat, exif_lng, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id.String(), "testdata/fake.jpg", 33.7952, -118.3088, 33.7952, -118.3088, time.Now().UTC().Format(time.RFC3339),
+		id.String(), photoPath, 33.7952, -118.3088, 33.7952, -118.3088, time.Now().UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		t.Fatalf("inserting test pending_upload: %v", err)
 	}
 	return id.String()
+
 }
