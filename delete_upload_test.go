@@ -47,6 +47,6 @@ func TestDeletePendingUpload_NonExistentIsStillNoContent(t *testing.T) {
 
 	rec := doRequest(t, mux, "DELETE", "/photo/not-a-real-id", "")
 	if rec.Code != http.StatusNoContent {
-		t.Fatal("status = %d, want %d (deleting something already gone is idempotent, not an error)", rec.Code, http.StatusNoContent)
+		t.Fatalf("status = %d, want %d (deleting something already gone is idempotent, not an error)", rec.Code, http.StatusNoContent)
 	}
 }
