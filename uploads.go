@@ -261,15 +261,20 @@ func deletePendingUpload(db *sql.DB, id, photoPath string) error {
 func deletePendingUploadHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
+		
 		var photoPath string
-
-		err := db.QueryRow(`SELECT photo_path FROM pending_uploads id = ?`, id).Scan(&photoPath)
+		err := db.QueryRow(`SELECT photo_path FROM pending_uploads WHERE id = ?`, id).Scan(&photoPath)
 		if errors.Is(err, sql.ErrNoRows) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
 		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := deletePendingUpload(db, id, photoPath); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
